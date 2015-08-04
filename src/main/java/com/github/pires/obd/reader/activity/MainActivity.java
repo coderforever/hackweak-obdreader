@@ -53,8 +53,25 @@ import com.github.pires.obd.reader.trips.TripLog;
 import com.github.pires.obd.reader.trips.TripRecord;
 import com.google.inject.Inject;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.protocol.HTTP;
+
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -185,7 +202,8 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
                     ObdReading reading = new ObdReading(lat, lon, alt, System.currentTimeMillis(), vin, temp);
                     new UploadAsyncTask().execute(reading);
 
-                } else if (prefs.getBoolean(ConfigActivity.ENABLE_FULL_LOGGING_KEY, false)) {
+                }
+                if (prefs.getBoolean(ConfigActivity.ENABLE_FULL_LOGGING_KEY, false)) {
                     // Write the current reading to CSV
                     final String vin = prefs.getString(ConfigActivity.VEHICLE_ID_KEY, "UNDEFINED_VIN");
                     Map<String, String> temp = new HashMap<String, String>();
@@ -665,24 +683,58 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
         protected Void doInBackground(ObdReading... readings) {
             Log.d(TAG, "Uploading " + readings.length + " readings..");
             // instantiate reading service client
-            final String endpoint = prefs.getString(ConfigActivity.UPLOAD_URL_KEY, "");
-            RestAdapter restAdapter = new RestAdapter.Builder()
-                    .setEndpoint(endpoint)
-                    .build();
-            ObdService service = restAdapter.create(ObdService.class);
-            // upload readings
+            String uploadURL = prefs.getString(ConfigActivity.UPLOAD_URL_KEY, "");
+            HttpClient httpClient = new DefaultHttpClient();
+            HttpPost httpPost = new HttpPost(uploadURL);
             for (ObdReading reading : readings) {
                 try {
-                    Response response = service.uploadReading(reading);
-                    assert response.getStatus() == 200;
-                } catch (RetrofitError re) {
-                    Log.e(TAG, re.toString());
+                    List<NameValuePair> params = new ArrayList<NameValuePair>();
+                    params.add(new BasicNameValuePair("Altitude", String.valueOf(reading.getAltitude())));
+                    params.add(new BasicNameValuePair("Latitude", String.valueOf(reading.getLatitude())));
+                    params.add(new BasicNameValuePair("Longitude", String.valueOf(reading.getLongitude())));
+                    params.add(new BasicNameValuePair("Timestamp", String.valueOf(reading.getTimestamp())));
+                    Map<String, String> otherPairs=reading.getReadings();
+                    for(Map.Entry<String, String> entry: otherPairs.entrySet()){
+                        params.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
+                    }
+                    httpPost.setEntity(new UrlEncodedFormEntity(params, HTTP.UTF_8));
+                    HttpResponse response = httpClient.execute(httpPost);
+                    HttpEntity entity = response.getEntity();
+                    if (entity != null) {
+                        InputStream instreams = entity.getContent();
+                        String str = convertStreamToString(instreams);
+                        System.out.println(str);
+                    }
+                } catch (Exception ex) {
+                    Log.e(TAG, ex.toString());
                 }
-
             }
             Log.d(TAG, "Done");
             return null;
         }
 
+        private String convertStreamToString(InputStream is) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+            StringBuilder sb = new StringBuilder();
+
+            String line = null;
+            try {
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line + "\n");
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    is.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            return sb.toString();
+        }
+
     }
+
+
 }

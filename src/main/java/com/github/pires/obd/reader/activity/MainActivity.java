@@ -117,6 +117,8 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
     private LocationProvider mLocProvider;
     private LogCSVWriter myCSVWriter;
     private Location mLastLocation;
+    private String lastDir;
+
     /// the trip log
     private TripLog triplog;
     private TripRecord currentTrip;
@@ -128,25 +130,24 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
 
         public void onSensorChanged(SensorEvent event) {
             float x = event.values[0];
-            String dir = "";
             if (x >= 337.5 || x < 22.5) {
-                dir = "N";
+                lastDir = "N";
             } else if (x >= 22.5 && x < 67.5) {
-                dir = "NE";
+                lastDir = "NE";
             } else if (x >= 67.5 && x < 112.5) {
-                dir = "E";
+                lastDir = "E";
             } else if (x >= 112.5 && x < 157.5) {
-                dir = "SE";
+                lastDir = "SE";
             } else if (x >= 157.5 && x < 202.5) {
-                dir = "S";
+                lastDir = "S";
             } else if (x >= 202.5 && x < 247.5) {
-                dir = "SW";
+                lastDir = "SW";
             } else if (x >= 247.5 && x < 292.5) {
-                dir = "W";
+                lastDir = "W";
             } else if (x >= 292.5 && x < 337.5) {
-                dir = "NW";
+                lastDir = "NW";
             }
-            updateTextView(compass, dir);
+            updateTextView(compass, lastDir);
         }
 
         public void onAccuracyChanged(Sensor sensor, int accuracy) {
@@ -180,13 +181,14 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
                 double lon = 0;
                 double alt = 0;
                 final int posLen = 7;
+
                 if (mGpsIsStarted && mLastLocation != null) {
                     lat = mLastLocation.getLatitude();
                     lon = mLastLocation.getLongitude();
                     alt = mLastLocation.getAltitude();
 
                     StringBuffer sb = new StringBuffer();
-                    sb.append("Lat: ");
+                    sb.append(" Lat: ");
                     sb.append(String.valueOf(mLastLocation.getLatitude()).substring(0, posLen));
                     sb.append(" Lon: ");
                     sb.append(String.valueOf(mLastLocation.getLongitude()).substring(0, posLen));
@@ -194,21 +196,19 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
                     sb.append(String.valueOf(mLastLocation.getAltitude()).substring(0, posLen));
                     gpsStatusTextView.setText(sb.toString());
                 }
+
+                final String vin = prefs.getString(ConfigActivity.VEHICLE_ID_KEY, "UNDEFINED_VIN");
+                Map<String, String> temp = new HashMap<String, String>();
+                temp.putAll(commandResult);
+                ObdReading reading = new ObdReading(lat, lon, alt, System.currentTimeMillis(), vin, lastDir, temp);
+
                 if (prefs.getBoolean(ConfigActivity.UPLOAD_DATA_KEY, false)) {
                     // Upload the current reading by http
-                    final String vin = prefs.getString(ConfigActivity.VEHICLE_ID_KEY, "UNDEFINED_VIN");
-                    Map<String, String> temp = new HashMap<String, String>();
-                    temp.putAll(commandResult);
-                    ObdReading reading = new ObdReading(lat, lon, alt, System.currentTimeMillis(), vin, temp);
                     new UploadAsyncTask().execute(reading);
 
                 }
                 if (prefs.getBoolean(ConfigActivity.ENABLE_FULL_LOGGING_KEY, false)) {
                     // Write the current reading to CSV
-                    final String vin = prefs.getString(ConfigActivity.VEHICLE_ID_KEY, "UNDEFINED_VIN");
-                    Map<String, String> temp = new HashMap<String, String>();
-                    temp.putAll(commandResult);
-                    ObdReading reading = new ObdReading(lat, lon, alt, System.currentTimeMillis(), vin, temp);
                     myCSVWriter.writeLineCSV(reading);
                 }
                 commandResult.clear();
@@ -431,11 +431,6 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
         menu.add(0, SETTINGS, 0, getString(R.string.menu_settings));
         return true;
     }
-
-    // private void staticCommand() {
-    // Intent commandIntent = new Intent(this, ObdReaderCommandActivity.class);
-    // startActivity(commandIntent);
-    // }
 
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
@@ -692,11 +687,12 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
                     params.add(new BasicNameValuePair("Altitude", String.valueOf(reading.getAltitude())));
                     params.add(new BasicNameValuePair("Latitude", String.valueOf(reading.getLatitude())));
                     params.add(new BasicNameValuePair("Longitude", String.valueOf(reading.getLongitude())));
-                    params.add(new BasicNameValuePair("Timestamp", String.valueOf(reading.getTimestamp())));
+                    params.add(new BasicNameValuePair("VehicleID", String.valueOf(reading.getVin())));
+                    params.add(new BasicNameValuePair("Direction", String.valueOf(reading.getDirection())));
                     Map<String, String> otherPairs=reading.getReadings();
-                    for(Map.Entry<String, String> entry: otherPairs.entrySet()){
-                        params.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
-                    }
+                    params.add(new BasicNameValuePair("Speed", String.valueOf(otherPairs.get(AvailableCommandNames.SPEED.name()))));
+                    params.add(new BasicNameValuePair("FuelEconomy", String.valueOf(otherPairs.get(AvailableCommandNames.FUEL_ECONOMY.name()))));
+
                     httpPost.setEntity(new UrlEncodedFormEntity(params, HTTP.UTF_8));
                     HttpResponse response = httpClient.execute(httpPost);
                     HttpEntity entity = response.getEntity();

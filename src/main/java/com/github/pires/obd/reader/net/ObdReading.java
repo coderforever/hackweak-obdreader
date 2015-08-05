@@ -23,6 +23,7 @@ public class ObdReading {
     private double latitude, longitude, altitude;
     private long timestamp;
     private String vehicleid; // vehicle id
+    private String direction; //direction
     private Map<String, String> readings;
 
     public ObdReading() {
@@ -30,12 +31,13 @@ public class ObdReading {
     }
 
     public ObdReading(double latitude, double longitude, double altitude, long timestamp,
-                      String vehicleid, Map<String, String> readings) {
+                      String vehicleid, String direction, Map<String, String> readings) {
         this.latitude = latitude;
         this.longitude = longitude;
         this.altitude = altitude;
         this.timestamp = timestamp;
         this.vehicleid = vehicleid;
+        this.direction=direction;
         this.readings = readings;
     }
 
@@ -77,6 +79,14 @@ public class ObdReading {
 
     public void setVin(String vehicleid) {
         this.vehicleid = vehicleid;
+    }
+
+    public void setDirection(String direction){
+        this.direction=direction;
+    }
+
+    public String getDirection(){
+        return this.direction;
     }
 
     public Map<String, String> getReadings() {

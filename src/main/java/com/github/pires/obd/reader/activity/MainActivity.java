@@ -43,6 +43,7 @@ import com.github.pires.obd.reader.R;
 import com.github.pires.obd.reader.config.ObdConfig;
 import com.github.pires.obd.reader.io.AbstractGatewayService;
 import com.github.pires.obd.reader.io.LogCSVWriter;
+import com.github.pires.obd.reader.io.LogJSONWriter;
 import com.github.pires.obd.reader.io.MockObdGatewayService;
 import com.github.pires.obd.reader.io.ObdCommandJob;
 import com.github.pires.obd.reader.io.ObdGatewayService;
@@ -116,6 +117,7 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
     private LocationManager mLocService;
     private LocationProvider mLocProvider;
     private LogCSVWriter myCSVWriter;
+    private LogJSONWriter myJSONWriter;
     private Location mLastLocation;
     private String lastDir;
 
@@ -210,6 +212,7 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
                 if (prefs.getBoolean(ConfigActivity.ENABLE_FULL_LOGGING_KEY, false)) {
                     // Write the current reading to CSV
                     myCSVWriter.writeLineCSV(reading);
+                    myJSONWriter.writeLineJSON(reading);
                 }
                 commandResult.clear();
             }
@@ -491,6 +494,11 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
                     prefs.getString(ConfigActivity.DIRECTORY_FULL_LOGGING_KEY,
                             getString(R.string.default_dirname_full_logging))
             );
+
+            myJSONWriter = new LogJSONWriter("Log" + sdf.format(new Date(mils)).toString() + ".json",
+                    prefs.getString(ConfigActivity.DIRECTORY_FULL_LOGGING_KEY,
+                            getString(R.string.default_dirname_full_logging))
+            );
         }
     }
 
@@ -506,6 +514,10 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
 
         if (myCSVWriter != null) {
             myCSVWriter.closeLogCSVWriter();
+        }
+
+        if(myJSONWriter!=null){
+            myJSONWriter.closeLogJSONWriter();
         }
     }
 

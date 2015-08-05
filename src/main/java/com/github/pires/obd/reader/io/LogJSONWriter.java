@@ -1,10 +1,11 @@
 package com.github.pires.obd.reader.io;
 
 import android.os.Environment;
-import android.util.Log;
 
 import com.github.pires.obd.enums.AvailableCommandNames;
 import com.github.pires.obd.reader.net.ObdReading;
+
+import org.json.JSONObject;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -15,16 +16,12 @@ import java.io.OutputStreamWriter;
 import java.util.Map;
 
 /**
- * Created by Max Christ on 14.07.15.
+ * Created by frank on 15/8/5.
  */
-
-public class LogCSVWriter {
-
+public class LogJSONWriter {
     private BufferedWriter buf;
 
-    private boolean isFirstLine;
-
-    public LogCSVWriter(String filename, String dirname) {
+    public LogJSONWriter(String filename, String dirname) {
 
         File sdCard = Environment.getExternalStorageDirectory();
         File dir = new File(sdCard.getAbsolutePath() + File.separator + dirname);
@@ -41,12 +38,9 @@ public class LogCSVWriter {
 
         OutputStreamWriter osw = new OutputStreamWriter(fos);
         this.buf = new BufferedWriter(osw);
-
-        isFirstLine=true;
-
     }
 
-    public void closeLogCSVWriter() {
+    public void closeLogJSONWriter() {
         try {
             buf.flush();
             buf.close();
@@ -55,27 +49,25 @@ public class LogCSVWriter {
         }
     }
 
-    public void writeLineCSV(ObdReading reading) {
-        String line="";
+    public void writeLineJSON(ObdReading reading) {
+        try{
+            JSONObject jsonObject=new JSONObject();
+            jsonObject.put("timestamp",reading.getTimestamp());
+            jsonObject.put("altitude", reading.getAltitude());
+            jsonObject.put("latitude", reading.getLatitude());
+            jsonObject.put("longitude", reading.getLongitude());
+            jsonObject.put("vehicleID", reading.getVin());
+            jsonObject.put("direction", reading.getDirection());
 
-        if(isFirstLine){
-            line+="timestamp,altitude,latitude,longitude,vehicleID,direction,speed,fuel\r\n";
+            Map<String, String> otherPairs=reading.getReadings();
+
+            jsonObject.put("speed", otherPairs.get(AvailableCommandNames.SPEED.name()));
+            jsonObject.put("fuel", otherPairs.get(AvailableCommandNames.FUEL_ECONOMY.name()));
+
+            addLine(jsonObject.toString());
+        }catch(Exception ex){
+
         }
-
-        isFirstLine=false;
-
-        line+=reading.getTimestamp()+",";
-        line+=reading.getAltitude()+",";
-        line+=reading.getLatitude()+",";
-        line+=reading.getLongitude()+",";
-        line+=reading.getVin()+",";
-        line+=reading.getDirection()+",";
-
-        Map<String, String> otherPairs=reading.getReadings();
-        line+=otherPairs.get(AvailableCommandNames.SPEED.name())+",";
-        line+=otherPairs.get(AvailableCommandNames.FUEL_ECONOMY.name());
-
-        addLine(line);
     }
 
 
